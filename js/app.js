@@ -361,15 +361,15 @@ function initGuestbook() {
 
 // ========== Map Navigation ==========
 function openNaverMap() {
-  window.location.href = 'nmap://search?query=부천 부일로 223 연그리다&appname=yootaejeon.github.io/Ah-in_birthday';
+  window.location.href = 'nmap://search?query=서울특별시 서초구 강남대로 213 엘타워&appname=yootaejeon.github.io/Ah-in_birthday';
 }
 
 function openKakaoMap() {
-  window.location.href = 'kakaomap://search?q=부천 부일로 223 연그리다';
+  window.location.href = 'kakaomap://search?q=서울특별시 서초구 강남대로 213 엘타워';
 }
 
 function openTmap() {
-  window.location.href = 'tmap://search?name=부천 부일로 223 연그리다';
+  window.location.href = 'tmap://search?name=서울특별시 서초구 강남대로 213 엘타워';
 }
 
 function openKakaoTaxi() {
@@ -400,21 +400,29 @@ function initKakaoMap() {
   kakao.maps.load(function() {
     var container = document.getElementById('kakao-map');
     if (!container) return;
-
+  
+    // 엘타워 위치
+    var position = new kakao.maps.LatLng(
+      37.482862229453,
+      127.03528069955
+    );
+  
     var options = {
-      center: new kakao.maps.LatLng(37.4888739, 126.7552879),
+      center: position,
       level: 3
     };
-
+  
     var map = new kakao.maps.Map(container, options);
-
-    var markerPosition = new kakao.maps.LatLng(37.4888739, 126.7552879);
-    var marker = new kakao.maps.Marker({ position: markerPosition });
-    marker.setMap(map);
-
-    var infowindow = new kakao.maps.InfoWindow({
-      content: '<div style="padding:5px;font-size:12px;font-family:Cafe24Oneprettynight,cursive;text-align:center;">연 그리다</div>'
+  
+    var marker = new kakao.maps.Marker({
+      position: position
     });
+    marker.setMap(map);
+  
+    var infowindow = new kakao.maps.InfoWindow({
+      content: '<div style="padding:5px;font-size:12px;font-family:Cafe24Oneprettynight,cursive;text-align:center;">엘타워</div>'
+    });
+  
     infowindow.open(map, marker);
   });
 }
@@ -432,11 +440,11 @@ function updateDday() {
   var diff = Math.ceil((birthday - today) / (1000 * 60 * 60 * 24));
 
   if (diff > 0) {
-    el.innerHTML = '아인이의 첫돌까지 <span class="dday-num">' + diff + '</span>일';
+    el.innerHTML = '루나, 루미의 첫돌까지 <span class="dday-num">' + diff + '</span>일';
   } else if (diff === 0) {
-    el.innerHTML = '오늘은 아인이의 <span class="dday-num">첫돌</span>입니다!';
+    el.innerHTML = '오늘은 루나, 루미의 <span class="dday-num">첫돌</span>입니다!';
   } else {
-    el.innerHTML = '아인이의 첫돌 <span class="dday-num">+' + Math.abs(diff) + '</span>일';
+    el.innerHTML = '루나, 루미의 첫돌 <span class="dday-num">+' + Math.abs(diff) + '</span>일';
   }
 }
 
@@ -541,7 +549,6 @@ document.addEventListener('DOMContentLoaded', function() {
   initGallery();
   initScrollAnimation();
   initKakaoMap();
-  updateDday();
   initMusic();
   initLightbox();
   initGuestbook();
