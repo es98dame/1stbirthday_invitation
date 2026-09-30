@@ -157,7 +157,7 @@ function initKakaoMap() {
         return;
       }
 
-      var position = new kakao.maps.LatLng(37.482862229453, 127.03528069955);
+      var position = new kakao.maps.LatLng(37.48224367567564, 127.03560349216255);
       kakaoMapInstance = new kakao.maps.Map(container, {
         center: position,
         level: 3
@@ -165,11 +165,6 @@ function initKakaoMap() {
 
       var marker = new kakao.maps.Marker({ position: position });
       marker.setMap(kakaoMapInstance);
-
-      var infowindow = new kakao.maps.InfoWindow({
-        content: '<div style="padding:5px;font-size:12px;font-family:Cafe24Oneprettynight,cursive;text-align:center;">엘타워</div>'
-      });
-      infowindow.open(kakaoMapInstance, marker);
 
       setTimeout(function() {
         if (kakaoMapInstance) kakaoMapInstance.relayout();
