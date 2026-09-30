@@ -1,7 +1,7 @@
 {
-  "name": "ah-in-birthday",
+  "name": "first-invitation",
   "version": "1.0.0",
-  "description": "아인이의 모바일 돌잔치 초대장",
+  "description": "루나, 루미의 모바일 돌잔치 초대장",
   "scripts": {
     "dev": "npx live-server --port=8080 --open=/index.html",
     "start": "npx live-server --port=8080 --open=/index.html"

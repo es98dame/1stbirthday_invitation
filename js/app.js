@@ -34,13 +34,14 @@ var gallery = {
   slides: null,
   track: null,
   slideWidth: 166, // 150px + 16px margin
-  totalImages: 8
+  totalImages: 9
 };
 
 function initGallery() {
   gallery.track = document.querySelector('.gallery-track');
   gallery.slides = document.querySelectorAll('.gallery-slide');
   if (!gallery.track || !gallery.slides.length) return;
+  gallery.totalImages = gallery.slides.length;
 
   gallery.track.addEventListener('touchstart', function(e) {
     gallery.startX = e.touches[0].pageX;
@@ -105,271 +106,17 @@ function updateDots() {
   });
 }
 
-// ========== Supabase Guestbook ==========
-var SUPABASE_URL = 'https://imilvjpgejjknyoaxorp.supabase.co';
-var SUPABASE_ANON_KEY = 'sb_publishable_kIfSnTJYMWRJ0ujtW4MdZg_gAIHlkbO';
-var supabaseClient = null;
-var MESSAGES_PER_PAGE = 5;
-var currentPage = 0;
-var totalMessages = 0;
-var editState = { id: null, password: null };
-
-function initSupabase() {
-  if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  }
-}
-
-function hashPassword(password) {
-  var encoder = new TextEncoder();
-  var data = encoder.encode(password);
-  return crypto.subtle.digest('SHA-256', data).then(function(buf) {
-    return Array.from(new Uint8Array(buf)).map(function(b) {
-      return b.toString(16).padStart(2, '0');
-    }).join('');
-  });
-}
-
-function submitGuestMessage() {
-  var name = document.getElementById('guest-name').value.trim();
-  var password = document.getElementById('guest-password').value.trim();
-  var message = document.getElementById('guest-message').value.trim();
-
-  if (!name) { alert('이름을 입력해주세요.'); return; }
-  if (!password) { alert('비밀번호를 입력해주세요.'); return; }
-  if (!message) { alert('메시지를 입력해주세요.'); return; }
-
-  if (!supabaseClient) {
-    alert('방명록 서비스에 연결할 수 없습니다.');
-    return;
-  }
-
-  var btn = document.querySelector('.guestbook-btn.submit');
-  btn.disabled = true;
-  btn.textContent = '보내는 중...';
-
-  hashPassword(password).then(function(hashed) {
-    supabaseClient.from('guestbook').insert([{
-      name: name,
-      message: message,
-      password: hashed
-    }]).then(function(result) {
-      btn.disabled = false;
-      btn.textContent = '축하 남기기';
-
-      if (result.error) {
-        alert('메시지 저장에 실패했습니다. 다시 시도해주세요.');
-        return;
-      }
-
-      document.getElementById('guest-name').value = '';
-      document.getElementById('guest-password').value = '';
-      document.getElementById('guest-message').value = '';
-      document.getElementById('char-count').textContent = '0';
-      loadMessages(0);
-    });
-  });
-}
-
-function loadMessages(page) {
-  if (!supabaseClient) return;
-  if (page === undefined) page = 0;
-  currentPage = page;
-
-  var from = page * MESSAGES_PER_PAGE;
-  var to = from + MESSAGES_PER_PAGE - 1;
-
-  supabaseClient.from('guestbook')
-    .select('id, name, message, created_at', { count: 'exact' })
-    .order('created_at', { ascending: false })
-    .range(from, to)
-    .then(function(result) {
-      if (result.error) return;
-      totalMessages = result.count;
-      renderMessages(result.data);
-      renderPagination();
-    });
-}
-
-function renderMessages(messages) {
-  var container = document.getElementById('guestbook-messages');
-  if (!container) return;
-
-  if (!messages || messages.length === 0) {
-    container.innerHTML = '<p class="guestbook-empty">아직 메시지가 없어요.<br>첫 번째 축하 메시지를 남겨주세요!</p>';
-    return;
-  }
-
-  var html = '';
-  messages.forEach(function(msg) {
-    var date = new Date(msg.created_at);
-    var dateStr = date.getFullYear() + '.' +
-      String(date.getMonth() + 1).padStart(2, '0') + '.' +
-      String(date.getDate()).padStart(2, '0');
-
-    html += '<div class="message-card" data-id="' + msg.id + '">' +
-      '<div class="message-header">' +
-        '<span class="message-name">' + escapeHtml(msg.name) + '</span>' +
-        '<span class="message-date">' + dateStr + '</span>' +
-      '</div>' +
-      '<p class="message-text">' + escapeHtml(msg.message) + '</p>' +
-      '<div class="message-actions">' +
-        '<button class="msg-action-btn" onclick="editMessage(' + msg.id + ')">수정</button>' +
-        '<span class="msg-action-divider">|</span>' +
-        '<button class="msg-action-btn" onclick="deleteMessage(' + msg.id + ')">삭제</button>' +
-      '</div>' +
-    '</div>';
-  });
-
-  container.innerHTML = html;
-}
-
-function renderPagination() {
-  var container = document.getElementById('guestbook-pagination');
-  if (!container) return;
-
-  var totalPages = Math.ceil(totalMessages / MESSAGES_PER_PAGE);
-  if (totalPages <= 1) {
-    container.innerHTML = '';
-    return;
-  }
-
-  var html = '';
-  for (var i = 0; i < totalPages; i++) {
-    var activeClass = i === currentPage ? ' active' : '';
-    html += '<button class="page-btn' + activeClass + '" onclick="loadMessages(' + i + ')">' + (i + 1) + '</button>';
-  }
-  container.innerHTML = html;
-}
-
-function deleteMessage(id) {
-  var password = prompt('삭제하려면 비밀번호를 입력하세요.');
-  if (!password) return;
-
-  hashPassword(password).then(function(hashed) {
-    supabaseClient.from('guestbook')
-      .delete()
-      .eq('id', id)
-      .eq('password', hashed)
-      .select()
-      .then(function(result) {
-        if (result.error) {
-          alert('삭제에 실패했습니다.');
-          return;
-        }
-        if (!result.data || result.data.length === 0) {
-          alert('비밀번호가 일치하지 않습니다.');
-          return;
-        }
-        loadMessages(currentPage);
-      });
-  });
-}
-
-function editMessage(id) {
-  var password = prompt('수정하려면 비밀번호를 입력하세요.');
-  if (!password) return;
-
-  hashPassword(password).then(function(hashed) {
-    supabaseClient.from('guestbook')
-      .select('id, name, message')
-      .eq('id', id)
-      .eq('password', hashed)
-      .then(function(result) {
-        if (result.error || !result.data || result.data.length === 0) {
-          alert('비밀번호가 일치하지 않습니다.');
-          return;
-        }
-        editState.id = id;
-        editState.password = hashed;
-        showEditForm(id, result.data[0]);
-      });
-  });
-}
-
-function showEditForm(id, data) {
-  var card = document.querySelector('.message-card[data-id="' + id + '"]');
-  if (!card) return;
-
-  var textEl = card.querySelector('.message-text');
-  var actionsEl = card.querySelector('.message-actions');
-
-  var textarea = document.createElement('textarea');
-  textarea.className = 'edit-textarea';
-  textarea.id = 'edit-text-' + id;
-  textarea.value = data.message;
-  textarea.maxLength = 200;
-  textEl.replaceWith(textarea);
-
-  actionsEl.innerHTML =
-    '<button class="msg-action-btn save" onclick="saveEdit()">저장</button>' +
-    '<span class="msg-action-divider">|</span>' +
-    '<button class="msg-action-btn cancel" onclick="cancelEdit()">취소</button>';
-}
-
-function saveEdit() {
-  if (!editState.id) return;
-
-  var textarea = document.getElementById('edit-text-' + editState.id);
-  var newMessage = textarea.value.trim();
-
-  if (!newMessage) {
-    alert('메시지를 입력해주세요.');
-    return;
-  }
-
-  supabaseClient.from('guestbook')
-    .update({ message: newMessage })
-    .eq('id', editState.id)
-    .eq('password', editState.password)
-    .select()
-    .then(function(result) {
-      editState.id = null;
-      editState.password = null;
-      if (result.error) {
-        alert('수정에 실패했습니다.');
-        return;
-      }
-      loadMessages(currentPage);
-    });
-}
-
-function cancelEdit() {
-  editState.id = null;
-  editState.password = null;
-  loadMessages(currentPage);
-}
-
-function escapeHtml(text) {
-  var div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-function initGuestbook() {
-  var textarea = document.getElementById('guest-message');
-  var counter = document.getElementById('char-count');
-  if (textarea && counter) {
-    textarea.addEventListener('input', function() {
-      counter.textContent = textarea.value.length;
-    });
-  }
-
-  initSupabase();
-  loadMessages(0);
-}
-
 // ========== Map Navigation ==========
 function openNaverMap() {
-  window.location.href = 'nmap://search?query=부천 부일로 223 연그리다&appname=yootaejeon.github.io/Ah-in_birthday';
+  window.location.href = 'nmap://search?query=서울특별시 서초구 강남대로 213 엘타워&appname=invitation.damikim.site';
 }
 
 function openKakaoMap() {
-  window.location.href = 'kakaomap://search?q=부천 부일로 223 연그리다';
+  window.location.href = 'kakaomap://search?q=서울특별시 서초구 강남대로 213 엘타워';
 }
 
 function openTmap() {
-  window.location.href = 'tmap://search?name=부천 부일로 223 연그리다';
+  window.location.href = 'tmap://search?name=서울특별시 서초구 강남대로 213 엘타워';
 }
 
 function openKakaoTaxi() {
@@ -394,29 +141,51 @@ function initScrollAnimation() {
 }
 
 // ========== Kakao Map ==========
+var kakaoMapInstance = null;
+
 function initKakaoMap() {
-  if (typeof kakao === 'undefined' || !kakao.maps) return;
+  var section = document.querySelector('.map-section');
+  var container = document.getElementById('kakao-map');
+  if (!section || !container) return;
 
-  kakao.maps.load(function() {
-    var container = document.getElementById('kakao-map');
-    if (!container) return;
+  function buildMap() {
+    if (typeof kakao === 'undefined' || !kakao.maps) return;
 
-    var options = {
-      center: new kakao.maps.LatLng(37.4888739, 126.7552879),
-      level: 3
-    };
+    kakao.maps.load(function() {
+      if (kakaoMapInstance) {
+        kakaoMapInstance.relayout();
+        return;
+      }
 
-    var map = new kakao.maps.Map(container, options);
+      var position = new kakao.maps.LatLng(37.482862229453, 127.03528069955);
+      kakaoMapInstance = new kakao.maps.Map(container, {
+        center: position,
+        level: 3
+      });
 
-    var markerPosition = new kakao.maps.LatLng(37.4888739, 126.7552879);
-    var marker = new kakao.maps.Marker({ position: markerPosition });
-    marker.setMap(map);
+      var marker = new kakao.maps.Marker({ position: position });
+      marker.setMap(kakaoMapInstance);
 
-    var infowindow = new kakao.maps.InfoWindow({
-      content: '<div style="padding:5px;font-size:12px;font-family:Cafe24Oneprettynight,cursive;text-align:center;">연 그리다</div>'
+      var infowindow = new kakao.maps.InfoWindow({
+        content: '<div style="padding:5px;font-size:12px;font-family:Cafe24Oneprettynight,cursive;text-align:center;">엘타워</div>'
+      });
+      infowindow.open(kakaoMapInstance, marker);
+
+      setTimeout(function() {
+        if (kakaoMapInstance) kakaoMapInstance.relayout();
+      }, 300);
     });
-    infowindow.open(map, marker);
-  });
+  }
+
+  var mapObserver = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        buildMap();
+      }
+    });
+  }, { threshold: 0.15 });
+
+  mapObserver.observe(section);
 }
 
 // ========== D-Day Counter ==========
@@ -432,11 +201,11 @@ function updateDday() {
   var diff = Math.ceil((birthday - today) / (1000 * 60 * 60 * 24));
 
   if (diff > 0) {
-    el.innerHTML = '아인이의 첫돌까지 <span class="dday-num">' + diff + '</span>일';
+    el.innerHTML = '루나, 루미의 첫돌까지 <span class="dday-num">' + diff + '</span>일';
   } else if (diff === 0) {
-    el.innerHTML = '오늘은 아인이의 <span class="dday-num">첫돌</span>입니다!';
+    el.innerHTML = '오늘은 루나, 루미의 <span class="dday-num">첫돌</span>입니다!';
   } else {
-    el.innerHTML = '아인이의 첫돌 <span class="dday-num">+' + Math.abs(diff) + '</span>일';
+    el.innerHTML = '루나, 루미의 첫돌 <span class="dday-num">+' + Math.abs(diff) + '</span>일';
   }
 }
 
@@ -484,14 +253,15 @@ function toggleMusic() {
 // ========== Lightbox ==========
 var lightboxIndex = 0;
 var lightboxImages = [
-  './gallery/ah-in 1.jpg',
-  './gallery/ah-in 2.jpg',
-  './gallery/ah-in 3.jpg',
-  './gallery/ah-in 4.jpg',
-  './gallery/ah-in 5.jpg',
-  './gallery/ah-in 6.jpg',
-  './gallery/ah-in 7.jpg',
-  './gallery/ah-in 8.jpg'
+  './gallery/1.jpg',
+  './gallery/2.jpg',
+  './gallery/3.jpg',
+  './gallery/4.jpg',
+  './gallery/5.jpg',
+  './gallery/6.jpg',
+  './gallery/7.jpg',
+  './gallery/8.jpg',
+  './gallery/9.jpg'
 ];
 
 function openLightbox(index) {
@@ -541,8 +311,6 @@ document.addEventListener('DOMContentLoaded', function() {
   initGallery();
   initScrollAnimation();
   initKakaoMap();
-  updateDday();
   initMusic();
   initLightbox();
-  initGuestbook();
 });
